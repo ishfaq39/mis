@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPM NIWAS Training Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#eef7fb;--panel:#ffffff;--ink:#123047;--muted:#6a7b89;--line:#d7e6ee;
+      --blue:#0f77b4;--teal:#00a7a5;--green:#34a853;--amber:#f5a623;--red:#e05252;--violet:#7257d5;
+      --shadow:0 18px 40px rgba(22,61,83,.12);--radius:22px;
+    }
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:linear-gradient(135deg,#eaf7ff 0%,#f7fbff 42%,#eefaf7 100%);color:var(--ink)}
+    header{padding:26px 34px 18px;background:linear-gradient(135deg,#0f77b4 0%,#00a7a5 70%,#40c4a4 100%);color:white;position:sticky;top:0;z-index:10;box-shadow:0 8px 24px rgba(15,119,180,.2)}
+    .top{display:flex;justify-content:space-between;gap:20px;align-items:center;flex-wrap:wrap}.title h1{margin:0;font-size:28px;letter-spacing:.2px}.title p{margin:7px 0 0;opacity:.9;font-size:14px}.filters{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.filterBox label{display:block;font-size:12px;margin-bottom:6px;opacity:.9}.filterBox select,.filterBox button{height:42px;border:0;border-radius:13px;padding:0 14px;font-weight:700;background:white;color:#0f4768;box-shadow:0 8px 20px rgba(0,0,0,.12)}.filterBox button{cursor:pointer;background:#083b57;color:white}
+    main{padding:24px 30px 40px;max-width:1480px;margin:auto}.status{padding:12px 16px;border-radius:14px;background:#fff7de;border:1px solid #f5d37b;color:#704f00;margin-bottom:16px;display:none}.grid{display:grid;gap:18px}.kpis{grid-template-columns:repeat(5,minmax(160px,1fr));margin-bottom:18px}.card{background:rgba(255,255,255,.92);border:1px solid rgba(215,230,238,.9);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}.kpi{position:relative;overflow:hidden}.kpi:after{content:"";position:absolute;right:-24px;top:-24px;width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,rgba(15,119,180,.13),rgba(0,167,165,.1))}.kpi .label{font-size:13px;color:var(--muted);font-weight:700}.kpi .value{font-size:27px;font-weight:900;margin-top:8px}.kpi .hint{font-size:12px;color:var(--muted);margin-top:4px}.charts{grid-template-columns:1.15fr .85fr}.charts2{grid-template-columns:.9fr 1.1fr;margin-top:18px}.card h2{font-size:17px;margin:0 0 12px}.chartWrap{height:360px}.tableCard{margin-top:18px}.tableTools{display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;align-items:center;flex-wrap:wrap}.search{height:38px;border:1px solid var(--line);border-radius:12px;padding:0 12px;min-width:260px}.tableWrap{overflow:auto;max-height:480px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:10px 11px;border-bottom:1px solid #e7f0f5;text-align:left;vertical-align:top}th{position:sticky;top:0;background:#f2f9fc;color:#16445f;font-size:12px;text-transform:uppercase;letter-spacing:.04em}tr:hover td{background:#fbfdff}.pill{display:inline-block;padding:4px 9px;border-radius:999px;background:#e9f8f7;color:#007c7a;font-weight:800;font-size:12px}.small{font-size:12px;color:var(--muted)}footer{padding:0 30px 26px;max-width:1480px;margin:auto;color:var(--muted);font-size:12px}@media(max-width:1100px){.kpis,.charts,.charts2{grid-template-columns:1fr}.chartWrap{height:310px}}@media(max-width:720px){header,main,footer{padding-left:16px;padding-right:16px}.title h1{font-size:22px}.kpis{grid-template-columns:1fr}.filterBox select,.filterBox button{width:100%}.filters{width:100%}.filterBox{flex:1 1 100%}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div class="title"><h1>SPM NIWAS Training Performance Dashboard</h1><p>Dynamic dashboard based on live Google Sheets: expenditure, participants, modes, programmes and financial year trends.</p></div>
+    <div class="filters">
+      <div class="filterBox"><label>Financial Year</label><select id="fyFilter"><option value="All">All Financial Years</option><option>FY 2022-23</option><option>FY 2023-24</option><option>FY 2024-25</option><option>FY 2025-26</option><option>FY 2026-27</option><option>FY 2027-28</option></select></div>
+      <div class="filterBox"><label>Programme</label><select id="programFilter"><option value="All">All Programmes</option></select></div>
+      <div class="filterBox"><label>Mode</label><select id="modeFilter"><option value="All">All Modes</option></select></div>
+      <div class="filterBox"><label>&nbsp;</label><button onclick="loadAll()">Refresh Live Data</button></div>
+    </div>
+  </div>
+</header>
+<main>
+  <div id="status" class="status"></div>
+  <section class="grid kpis">
+    <div class="card kpi"><div class="label">Total Expenditure</div><div id="kpiExpense" class="value">—</div><div class="hint">as per expenditure sheet</div></div>
+    <div class="card kpi"><div class="label">Training Entries</div><div id="kpiTrainings" class="value">—</div><div class="hint">filtered records</div></div>
+    <div class="card kpi"><div class="label">Officials Trained</div><div id="kpiParticipants" class="value">—</div><div class="hint">from participant sheets / pivots</div></div>
+    <div class="card kpi"><div class="label">Average Cost / Training</div><div id="kpiAvg" class="value">—</div><div class="hint">expenditure divided by training entries</div></div>
+    <div class="card kpi"><div class="label">Highest Cost Head</div><div id="kpiHead" class="value">—</div><div class="hint">major expenditure component</div></div>
+  </section>
+  <section class="grid charts">
+    <div class="card"><h2>Financial Year-wise Expenditure by Programme</h2><div class="chartWrap"><canvas id="fyProgramChart"></canvas></div></div>
+    <div class="card"><h2>Training Mode Mix</h2><div class="chartWrap"><canvas id="modeChart"></canvas></div></div>
+  </section>
+  <section class="grid charts2">
+    <div class="card"><h2>Expenditure by Cost Head</h2><div class="chartWrap"><canvas id="costHeadChart"></canvas></div></div>
+    <div class="card"><h2>Officials Trained by FY and Mission</h2><div class="chartWrap"><canvas id="participantsChart"></canvas></div></div>
+  </section>
+  <section class="card tableCard">
+    <div class="tableTools"><div><h2 style="margin-bottom:4px">Detailed Training Expenditure Table</h2><div class="small">Search and filters apply instantly. The table is rebuilt from live Google Sheet data.</div></div><input id="tableSearch" class="search" placeholder="Search course, programme, mode..." oninput="render()"></div>
+    <div class="tableWrap"><table id="detailTable"></table></div>
+  </section>
+</main>
+<footer>Designed for live Google Sheets. For best results, keep the source sheets shared as “Anyone with the link can view”. If the structure of columns changes, update the CONFIG section at the top of the script.</footer>
+<script>
+const CONFIG={
+  expenditure:{id:'1aAgDnovRCH8D8xoZvDB4_41wUJdA1qQjPL4ZkhH2mQA',sheets:['Sheet1','Report']},
+  participants:{id:'1QBiH1F0IvXaKWKaOkqfDVnHPioQw2BDGH2Ia5CILElg',sheets:['Dashboard','Physical','Online','Offsite','Certificate course','Webinar','Workshop','Report']}
+};
+const FY_ORDER=['FY 2022-23','FY 2023-24','FY 2024-25','FY 2025-26','FY 2026-27','FY 2027-28'];
+let raw={expense:[],participantRows:[]}, charts={};
+function showStatus(msg,isError=false){const el=document.getElementById('status');el.style.display=msg?'block':'none';el.style.background=isError?'#fff0f0':'#fff7de';el.style.borderColor=isError?'#f0aaaa':'#f5d37b';el.style.color=isError?'#8a1f1f':'#704f00';el.innerHTML=msg||'';}
+function gvizUrl(id,sheet){return `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}&t=${Date.now()}`}
+async function fetchSheet(id,sheet){const res=await fetch(gvizUrl(id,sheet)); if(!res.ok) throw new Error(`${sheet}: ${res.status}`); const txt=await res.text(); const json=JSON.parse(txt.substring(txt.indexOf('{'),txt.lastIndexOf('}')+1)); const cols=json.table.cols.map(c=>(c.label||c.id||'').trim()); return (json.table.rows||[]).map(r=>{let o={__sheet:sheet}; (r.c||[]).forEach((c,i)=>{o[cols[i]||`Col${i+1}`]=c?(c.f??c.v??''):''}); return o;}).filter(o=>Object.values(o).some(v=>String(v).trim()!==''));}
+function num(v){if(v==null)return 0; let s=String(v).replace(/[₹,\s]/g,''); let n=parseFloat(s); return isNaN(n)?0:n;}
+function fmtMoney(n){return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n||0)}
+function fmt(n){return new Intl.NumberFormat('en-IN').format(Math.round(n||0))}
+function fyFromDate(v){let s=String(v||''); let m=s.match(/(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})/); if(!m){m=s.match(/(\d{4})/); if(!m)return 'Unknown'; let y=+m[1]; return `FY ${y}-${String(y+1).slice(-2)}`;} let mon=+m[2], y=+m[3]; let start=mon>=4?y:y-1; return `FY ${start}-${String(start+1).slice(-2)}`;}
+function findVal(row,names){let keys=Object.keys(row); for(const n of names){let k=keys.find(x=>x.toLowerCase().replace(/[^a-z0-9]/g,'').includes(n)); if(k)return row[k];} return '';}
+function normaliseExpense(rows){return rows.map(r=>{
+  const program=findVal(r,['program','mission'])||Object.values(r)[0]; const name=findVal(r,['trainingname','nameofcourse','course'])||Object.values(r)[1]; const mode=findVal(r,['trainingmode','mode'])||''; const date=findVal(r,['date','dates'])||'';
+  const total=findVal(r,['total']); const heads=['Honorarium (RP)','TA (RP)','Transportation','Hotel','Food','Training Kit','Photo','Printing','Training Asst.','Misc.'];
+  let out={program:String(program||'').trim(),name:String(name||'').trim(),mode:String(mode||'').trim(),date:String(date||'').trim(),fy:fyFromDate(date),total:num(total),heads:{},__sheet:r.__sheet};
+  heads.forEach(h=>{let v=findVal(r,[h.toLowerCase().replace(/[^a-z0-9]/g,'')]); out.heads[h]=num(v);});
+  if(out.total===0) out.total=Object.values(out.heads).reduce((a,b)=>a+b,0); return out;
+}).filter(x=>x.name && x.name.toLowerCase()!=='training name' && (x.total>0 || x.date || x.mode));}
+function normaliseParticipants(rows){let out=[]; rows.forEach(r=>{const fyRaw=findVal(r,['fys','fy','financialyear']); const total=findVal(r,['total','officialstrained','participant']); const jjm=findVal(r,['jjm']); const sbm=findVal(r,['sbm']); const mode=r.__sheet; if(String(fyRaw).match(/20\d{2}/)||String(fyRaw).startsWith('FY')) out.push({fy:String(fyRaw).startsWith('FY')?fyRaw:`FY ${fyRaw}`,mode,total:num(total),jjm:num(jjm),sbm:num(sbm)});}); return out;}
+async function loadAll(){showStatus('Loading live data from both Google Sheets...'); try{
+  const expSheets=await Promise.allSettled(CONFIG.expenditure.sheets.map(s=>fetchSheet(CONFIG.expenditure.id,s))); const partSheets=await Promise.allSettled(CONFIG.participants.sheets.map(s=>fetchSheet(CONFIG.participants.id,s)));
+  const expRows=expSheets.flatMap(x=>x.status==='fulfilled'?x.value:[]); const partRows=partSheets.flatMap(x=>x.status==='fulfilled'?x.value:[]);
+  raw.expense=normaliseExpense(expRows); raw.participantRows=normaliseParticipants(partRows);
+  populateFilters(); render(); showStatus(`Live data loaded: ${raw.expense.length} expenditure records and ${raw.participantRows.length} participant/pivot rows.`);
+ }catch(e){showStatus(`Could not load live data. Please ensure both Google Sheets are shared as “Anyone with the link can view”. Technical detail: ${e.message}`,true);}}
+function populateFilters(){const ps=[...new Set(raw.expense.map(x=>x.program).filter(Boolean))].sort(); const ms=[...new Set(raw.expense.map(x=>x.mode).filter(Boolean))].sort(); fill('programFilter',['All',...ps]); fill('modeFilter',['All',...ms]);}
+function fill(id,arr){const el=document.getElementById(id), cur=el.value; el.innerHTML=arr.map(x=>`<option value="${x}">${x==='All'?'All':x}</option>`).join(''); if(arr.includes(cur))el.value=cur;}
+function filtered(){let fy=document.getElementById('fyFilter').value, p=document.getElementById('programFilter').value, m=document.getElementById('modeFilter').value; return raw.expense.filter(x=>(fy==='All'||x.fy===fy)&&(p==='All'||x.program===p)&&(m==='All'||x.mode===m));}
+function partFiltered(){let fy=document.getElementById('fyFilter').value; return raw.participantRows.filter(x=>fy==='All'||x.fy===fy);}
+function groupSum(arr,key,val='total'){return arr.reduce((a,x)=>{let k=typeof key==='function'?key(x):x[key]; a[k]=(a[k]||0)+(typeof val==='function'?val(x):x[val]||0); return a;},{});}
+function render(){const data=filtered(), parts=partFiltered(); const total=data.reduce((a,x)=>a+x.total,0), count=data.length, pTotal=parts.reduce((a,x)=>a+x.total,0); const headTotals={}; data.forEach(x=>Object.entries(x.heads).forEach(([h,v])=>headTotals[h]=(headTotals[h]||0)+v)); const topHead=Object.entries(headTotals).sort((a,b)=>b[1]-a[1])[0];
+  kpiExpense.textContent=fmtMoney(total); kpiTrainings.textContent=fmt(count); kpiParticipants.textContent=fmt(pTotal); kpiAvg.textContent=fmtMoney(count?total/count:0); kpiHead.textContent=topHead?topHead[0]:'—';
+  drawFYProgram(data); drawMode(data); drawHeads(headTotals); drawParticipants(parts); renderTable(data);
+}
+function chart(id,type,data,options){if(charts[id])charts[id].destroy(); charts[id]=new Chart(document.getElementById(id),{type,data,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.dataset.label||c.label}: ${fmt(c.raw)}`}}},scales:type==='doughnut'?{}:{y:{beginAtZero:true,ticks:{callback:v=>fmt(v)}},x:{grid:{display:false}}},...options}});}
+function drawFYProgram(data){const fys=FY_ORDER, programs=[...new Set(data.map(x=>x.program||'Other'))]; const ds=programs.map((p,i)=>({label:p,data:fys.map(f=>data.filter(x=>x.fy===f&&(x.program||'Other')===p).reduce((a,x)=>a+x.total,0)),borderWidth:1})); chart('fyProgramChart','bar',{labels:fys,datasets:ds},{scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{callback:v=>fmt(v)}}}})}
+function drawMode(data){const g=groupSum(data,'mode'); chart('modeChart','doughnut',{labels:Object.keys(g),datasets:[{data:Object.values(g),borderWidth:2}]},{cutout:'62%'})}
+function drawHeads(headTotals){const entries=Object.entries(headTotals).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]); chart('costHeadChart','bar',{labels:entries.map(x=>x[0]),datasets:[{label:'Amount',data:entries.map(x=>x[1]),borderWidth:1}]},{indexAxis:'y'})}
+function drawParticipants(parts){let fys=FY_ORDER; let ds=[{label:'JJM',data:fys.map(f=>parts.filter(x=>x.fy===f).reduce((a,x)=>a+x.jjm,0))},{label:'SBM',data:fys.map(f=>parts.filter(x=>x.fy===f).reduce((a,x)=>a+x.sbm,0))},{label:'Total',data:fys.map(f=>parts.filter(x=>x.fy===f).reduce((a,x)=>a+x.total,0)),type:'line',tension:.35,borderWidth:3}]; chart('participantsChart','bar',{labels:fys,datasets:ds},{})}
+function renderTable(data){let q=(document.getElementById('tableSearch').value||'').toLowerCase(); let rows=data.filter(x=>[x.program,x.name,x.mode,x.date,x.fy].join(' ').toLowerCase().includes(q)).sort((a,b)=>b.total-a.total).slice(0,300); const table=document.getElementById('detailTable'); table.innerHTML=`<thead><tr><th>FY</th><th>Programme</th><th>Training Name</th><th>Mode</th><th>Date</th><th>Total Expenditure</th></tr></thead><tbody>${rows.map(x=>`<tr><td><span class="pill">${x.fy}</span></td><td>${x.program}</td><td>${x.name}</td><td>${x.mode}</td><td>${x.date}</td><td><b>${fmtMoney(x.total)}</b></td></tr>`).join('')}</tbody>`;}
+['fyFilter','programFilter','modeFilter'].forEach(id=>document.getElementById(id).addEventListener('change',render));
+loadAll();
+</script>
+</body>
+</html>

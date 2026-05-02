@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SPM NIWAS Live Dynamic Training Dashboard</title>
+<style>
+:root{--blue:#244F8F;--green:#C6E0B4;--yellow:#FFF200;--grey:#D9D9D9;--white:#fff;--ink:#0b0b0b;--muted:#637083;}
+*{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f7fb;color:var(--ink)}
+.toolbar{max-width:1280px;margin:18px auto 10px;padding:12px 16px;background:#fff;border:1px solid #d8e1ef;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.toolbar h1{font-size:20px;margin:0;color:#183f75}.toolbar small{color:var(--muted)}.btns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}button{border:0;background:#244F8F;color:white;padding:9px 13px;border-radius:8px;font-weight:700;cursor:pointer}button.secondary{background:#0f766e}button.light{background:#eef4ff;color:#244F8F;border:1px solid #bfd2f0}.status{font-size:12px;color:#475569;width:100%;line-height:1.4}.note{background:#eef6ff;border:1px solid #b7d6ff;color:#1f477f;padding:10px 12px;border-radius:8px;margin:0 auto 16px;max-width:1280px;font-size:13px;line-height:1.45}.dashboard{max-width:1280px;margin:0 auto 28px;background:var(--blue);padding:22px 28px 30px;min-height:720px;box-shadow:0 4px 18px rgba(0,0,0,.16)}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}.card{background:white;border-left:6px solid var(--green);padding:12px 14px;min-height:70px}.card .label{font-weight:700;color:#244F8F;font-size:13px;text-transform:uppercase}.card .value{font-size:28px;font-weight:800;margin-top:4px}.section{margin-bottom:26px}.section-title{background:var(--green);border:2px solid var(--yellow);font-weight:800;font-size:20px;text-align:center;padding:4px 10px;width:82%;margin:0 auto 24px;letter-spacing:.25px;text-transform:uppercase}.tables{display:grid;grid-template-columns:1fr 1fr;gap:42px;justify-content:center;align-items:start;padding:0 52px}.table-block{background:white}.table-caption{text-align:center;background:#fff;font-weight:800;font-size:20px;padding:3px 4px 4px}table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:20px;background:#fff}th{background:var(--grey);padding:2px 6px;text-align:center;font-weight:800}td{padding:2px 6px;text-align:center;font-weight:500}tr.total-row td{background:var(--grey);font-weight:800}.separator{height:4px;background:var(--yellow);margin:24px -28px 26px}.error{background:#fff4f4;border:1px solid #ffb4b4;color:#8a1f1f;padding:14px;border-radius:8px;margin:20px 0}.hidden{display:none}
+@media print{.toolbar,.note{display:none}body{background:white}.dashboard{box-shadow:none;max-width:none;margin:0}.summary{display:none}.section-title{font-size:16px}table,.table-caption{font-size:14px}}
+@media(max-width:900px){.dashboard{padding:14px}.summary{grid-template-columns:1fr 1fr}.tables{grid-template-columns:1fr;padding:0;gap:18px}.section-title{width:100%;font-size:15px}table,.table-caption{font-size:14px}.separator{margin-left:-14px;margin-right:-14px}}
+</style>
+</head>
+<body>
+<div class="toolbar"><div><h1>SPM NIWAS Training Status Dashboard</h1><small>Live dashboard. It reads base sheets from Google Sheets and ignores Report/Dashboard output sheets.</small></div><div class="btns"><button onclick="loadLiveData(true)">Refresh Now</button><button class="secondary" onclick="downloadCSV()">Download Report CSV</button><button class="light" onclick="window.print()">Print / Save PDF</button></div><div id="status" class="status">Loading live data…</div></div>
+<div class="note"><b>Dynamic behaviour:</b> Rows added, deleted, or amended in the base sheets are reflected after refresh/page reload. Financial Years are generated dynamically from training dates using April–March logic. For live loading, the Google Sheet must be accessible to viewers with the link.</div>
+<main id="dashboard" class="dashboard"></main>
+<script>
+const SPREADSHEET_ID = "1tZb3aCcLWM1qT1UOSTmCYBxqki1uFV5kv9r_cuj7BVI";
+const OUTPUT_SHEETS = ["dashboard", "report"];
+const CONFIGS = [
+ {sheetName:"Physical",title:"STATUS OF PHYSICAL TRAINING PROGRAMMES CONDUCTED AT SPM NIWAS",activityName:"Physical Training"},
+ {sheetName:"Online",title:"STATUS OF ONLINE TRAINING PROGRAMMES CONDUCTED THROUGH SPM NIWAS DIGITAL ACADEMY",activityName:"Online Training"},
+ {sheetName:"Offsite",title:"STATUS OF OFFSITE TRAINING PROGRAMMES CONDUCTED BY SPM NIWAS",activityName:"Offsite Training"},
+ {sheetName:"Certificate course",title:"STATUS OF CERTIFICATE COURSES CONDUCTED BY SPM NIWAS",activityName:"Certificate Course"},
+ {sheetName:"Webinar",title:"STATUS OF WEBINARS CONDUCTED BY SPM NIWAS",activityName:"Webinar"},
+ {sheetName:"Workshop",title:"STATUS OF WORKSHOPS CONDUCTED BY SPM NIWAS",activityName:"Workshop"}
+];
+const STATE_KEYWORDS=["andaman","andhra","arunachal","assam","bihar","chattisgarh","chhattisgarh","delhi","dadra","goa","gujarat","haryana","himachal","jammu","jharkhand","karnataka","kerala","ladakh","lakshadweep","madhya","maharashtra","manipur","meghalaya","mizoram","nagaland","odisha","pondicherry","puducherry","punjab","rajasthan","sikkim","tamil","telangana","tripura","uttar","uttarakhand","west"];
+let currentRecords=[]; let currentSummary=[];
+function cleanText(v){ if(v===null||v===undefined) return ""; return String(v).replace(/\n/g," ").replace(/\s+/g," ").trim(); }
+function norm(s){return cleanText(s).toLowerCase();}
+function nfmt(n){return Number(n||0).toLocaleString('en-IN');}
+function normalizeProgramme(v){const t=norm(v); if(!t) return ""; if(t.includes("jjm")||t.includes("jal jeevan")) return "JJM"; if(t.includes("sbm")||t.includes("swachh")) return "SBM"; return "Others";}
+function parseNum(v){ if(v===null||v===undefined||v==="") return 0; if(typeof v==="number") return isFinite(v)?v:0; const x=String(v).replace(/,/g,"").match(/-?\d+(\.\d+)?/); return x?Number(x[0]):0;}
+function findHeaderRow(rows){
+ for(let r=0;r<Math.min(rows.length,15);r++){const hs=rows[r].map(norm); const score = hs.some(h=>h.includes("prog")) + hs.some(h=>h.includes("date")) + hs.some(h=>h.includes("status")) + hs.some(h=>STATE_KEYWORDS.some(k=>h.includes(k))); if(score>=2) return r;}
+ return 0;
+}
+function findHeader(headers,names){const hs=headers.map(norm); for(const name of names){const t=norm(name); const i=hs.findIndex(h=>h===t||h.includes(t)); if(i>=0) return i;} return -1;}
+function isStateHeader(h){const t=norm(h); if(!t||t.includes("total")||t.includes("remark")||t.includes("status")) return false; return STATE_KEYWORDS.some(k=>t.includes(k));}
+function getFinancialYear(value){
+ if(value instanceof Date && !isNaN(value)){const y=value.getFullYear(), m=value.getMonth()+1; return m>=4 ? `${y}-${String(y+1).slice(-2)}` : `${y-1}-${String(y).slice(-2)}`;}
+ const text=cleanText(value); if(!text) return ""; let m=text.match(/Date\((\d{4}),(\d{1,2}),(\d{1,2})\)/i); if(m){const y=+m[1], mon=+m[2]+1; return mon>=4?`${y}-${String(y+1).slice(-2)}`:`${y-1}-${String(y).slice(-2)}`;}
+ m=text.match(/(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/); if(m){let mon=+m[2], y=+m[3]; if(y<100) y+=2000; return mon>=4?`${y}-${String(y+1).slice(-2)}`:`${y-1}-${String(y).slice(-2)}`;}
+ const months={jan:1,january:1,feb:2,february:2,mar:3,march:3,apr:4,april:4,may:5,jun:6,june:6,jul:7,july:7,aug:8,august:8,sep:9,sept:9,september:9,oct:10,october:10,nov:11,november:11,dec:12,december:12}; const lower=text.toLowerCase();
+ for(const k in months){ if(lower.includes(k)){const ym=lower.match(/(?:'|\s|-)(\d{2,4})/); if(ym){let y=+ym[1]; if(y<100) y+=2000; const mon=months[k]; return mon>=4?`${y}-${String(y+1).slice(-2)}`:`${y-1}-${String(y).slice(-2)}`;}}}
+ m=text.match(/20\d{2}/); if(m){const y=+m[0]; return `${y}-${String(y+1).slice(-2)}`;} return "";
+}
+function loadSheet(sheetName){
+ return new Promise((resolve,reject)=>{const cb="gviz_cb_"+Math.random().toString(36).slice(2); window[cb]=function(resp){try{delete window[cb]; script.remove(); if(resp.status&&resp.status!=='ok') throw new Error(resp.errors?resp.errors.map(e=>e.detailed_message||e.message).join('; '):resp.status); const cols=(resp.table.cols||[]).map(c=>c.label||c.id||""); const rows=(resp.table.rows||[]).map(r=>(r.c||[]).map(c=>c? (c.v!==undefined?c.v:c.f) : "")); resolve({sheetName,rows:[cols,...rows]});}catch(e){reject(e);}}; const script=document.createElement('script'); script.onerror=()=>{delete window[cb]; reject(new Error('Unable to load '+sheetName));}; script.src=`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}&tqx=responseHandler:${cb}&tq=${encodeURIComponent('select *')}&cache_buster=${Date.now()}`; document.body.appendChild(script); });
+}
+async function loadLiveData(manual=false){
+ setStatus((manual?'Refreshing':'Loading')+' live data from Google Sheet…');
+ try{const packs=await Promise.all(CONFIGS.filter(c=>!OUTPUT_SHEETS.includes(norm(c.sheetName))).map(c=>loadSheet(c.sheetName).then(p=>({...p,config:c})))); let records=[]; for(const p of packs){records=records.concat(extractRecords(p.rows,p.config));} currentRecords=records; render(records); setStatus(`Live dashboard updated at ${new Date().toLocaleString('en-IN')}. Records read: ${records.length}. Changes in base sheets will reflect after Refresh Now or page reload.`);}
+ catch(e){document.getElementById('dashboard').innerHTML=`<div class="error"><b>Live data could not be loaded.</b><br>${cleanText(e.message)}<br><br>Please ensure the Google Sheet is shared as “Anyone with the link can view”.</div>`; setStatus('Error: '+e.message);}
+}
+function extractRecords(rows,config){
+ if(!rows||rows.length<2) return []; const headerRow=findHeaderRow(rows); const headers=rows[headerRow].map(cleanText); const data=rows.slice(headerRow+1); const isWebinar=norm(config.sheetName)==='webinar';
+ const progCol=findHeader(headers,["Prog Name","Section","Programme","Program"]); const dateCol=findHeader(headers,["Training Date","Course Date","Date"]); const statusCol=findHeader(headers,["Status"]); const remarksCol=findHeader(headers,["Remarks - No. of participants, etc.","Remarks","Participants"]); const nameCol=findHeader(headers,["Training / Workshop Name","Training Name","Name of Training","Course Name","Title"]);
+ const stateCols=headers.map((h,i)=>isStateHeader(h)?i:-1).filter(i=>i>=0);
+ const firstState=stateCols.length?Math.min(...stateCols):-1; const records=[];
+ data.forEach(row=>{ if(row.every(v=>cleanText(v)==='')) return; const programme=normalizeProgramme(progCol>=0?row[progCol]:""); if(!programme) return; const fy=getFinancialYear(dateCol>=0?row[dateCol]:""); if(!fy) return; let participants=0;
+  if(isWebinar){const status=statusCol>=0?norm(row[statusCol]):""; if(status && status!=="conducted") return; participants=parseNum(remarksCol>=0?row[remarksCol]:0);} else if(stateCols.length){stateCols.forEach(c=>participants+=parseNum(row[c]));} else if(firstState>=0){for(let c=firstState;c<row.length;c++){if(!/total|remark|status/i.test(headers[c]||'')) participants+=parseNum(row[c]);}}
+  records.push({activity:config.activityName,sheet:config.sheetName,fy,programme,participants,trainings:1,name:nameCol>=0?cleanText(row[nameCol]):""}); }); return records;
+}
+function fullFYList(records){const years=[...new Set(records.map(r=>r.fy).filter(Boolean))].sort((a,b)=>+a.split('-')[0]-+b.split('-')[0]); if(!years.length) return []; const s=+years[0].split('-')[0], e=+years[years.length-1].split('-')[0]; const out=[]; for(let y=s;y<=e;y++) out.push(`${y}-${String(y+1).slice(-2)}`); return out;}
+function sum(records,fy,prog,metric){return records.filter(r=>r.fy===fy&&r.programme===prog).reduce((a,r)=>a+Number(r[metric]||0),0)}
+function render(records){const dash=document.getElementById('dashboard'); const fys=fullFYList(records); const totalTrain=records.length; const totalParticipants=records.reduce((a,r)=>a+r.participants,0); const jjm=records.filter(r=>r.programme==='JJM').reduce((a,r)=>a+r.participants,0); const sbm=records.filter(r=>r.programme==='SBM').reduce((a,r)=>a+r.participants,0); let html=`<div class="summary"><div class="card"><div class="label">Total Trainings</div><div class="value">${nfmt(totalTrain)}</div></div><div class="card"><div class="label">Officials Trained</div><div class="value">${nfmt(totalParticipants)}</div></div><div class="card"><div class="label">JJM Participants</div><div class="value">${nfmt(jjm)}</div></div><div class="card"><div class="label">SBM Participants</div><div class="value">${nfmt(sbm)}</div></div></div>`;
+ currentSummary=[]; CONFIGS.forEach((cfg,idx)=>{const rec=records.filter(r=>r.activity===cfg.activityName); if(!rec.length) return; html+=`<section class="section"><div class="section-title">${cfg.title}</div><div class="tables"><div class="table-block"><div class="table-caption">Total No. of Trainings conducted</div><table><thead><tr><th>FYs</th><th>JJM</th><th>SBM</th><th>Others</th><th>Total</th></tr></thead><tbody>`; let tj=0,ts=0,to=0; fys.forEach(fy=>{const j=sum(rec,fy,'JJM','trainings'),s=sum(rec,fy,'SBM','trainings'),o=sum(rec,fy,'Others','trainings'); tj+=j;ts+=s;to+=o; html+=`<tr><td>${fy}</td><td>${nfmt(j)}</td><td>${nfmt(s)}</td><td>${nfmt(o)}</td><td><b>${nfmt(j+s+o)}</b></td></tr>`; currentSummary.push([cfg.activityName,fy,'Trainings',j,s,o,j+s+o]);}); html+=`<tr class="total-row"><td>Total</td><td>${nfmt(tj)}</td><td>${nfmt(ts)}</td><td>${nfmt(to)}</td><td>${nfmt(tj+ts+to)}</td></tr></tbody></table></div>`;
+ html+=`<div class="table-block"><div class="table-caption">Total No. of Officials trained</div><table><thead><tr><th>FYs</th><th>JJM</th><th>SBM</th><th>Others</th><th>Total</th></tr></thead><tbody>`; let pj=0,ps=0,po=0; fys.forEach(fy=>{const j=sum(rec,fy,'JJM','participants'),s=sum(rec,fy,'SBM','participants'),o=sum(rec,fy,'Others','participants'); pj+=j;ps+=s;po+=o; html+=`<tr><td>${fy}</td><td>${nfmt(j)}</td><td>${nfmt(s)}</td><td>${nfmt(o)}</td><td><b>${nfmt(j+s+o)}</b></td></tr>`; currentSummary.push([cfg.activityName,fy,'Participants',j,s,o,j+s+o]);}); html+=`<tr class="total-row"><td>Total</td><td>${nfmt(pj)}</td><td>${nfmt(ps)}</td><td>${nfmt(po)}</td><td>${nfmt(pj+ps+po)}</td></tr></tbody></table></div></div></section>`; if(idx<CONFIGS.length-1) html+=`<div class="separator"></div>`; }); dash.innerHTML=html;}
+function downloadCSV(){const rows=[["Activity","FY","Metric","JJM","SBM","Others","Total"],...currentSummary]; const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='spm_niwas_live_dashboard_report.csv'; a.click(); URL.revokeObjectURL(a.href);}
+function setStatus(msg){document.getElementById('status').textContent=msg;}
+loadLiveData(false);
+setInterval(()=>loadLiveData(false), 5*60*1000);
+</script>
+</body>
+</html>
